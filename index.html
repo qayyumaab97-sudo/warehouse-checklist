@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily Warehouse Checklist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+:root{
+  --ground:#F5F7F4; --surface:#FFFFFF; --surface-2:#ECF0EA;
+  --ink:#141A16; --ink-2:#434C46; --ink-3:#707A74;
+  --rule:#D8DED7; --rule-2:#BEC6BD;
+  --accent:#0A6A4A; --accent-soft:#E1EFE8;
+  --warn:#8F5D00; --warn-soft:#F8EFDA;
+  --crit:#A32A20; --crit-soft:#FAE6E3;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,"Courier New",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0F1210; --surface:#171B18; --surface-2:#1E231F;
+    --ink:#E7EBE6; --ink-2:#AEB7B0; --ink-3:#828C86;
+    --rule:#2A302B; --rule-2:#3B433D;
+    --accent:#5CC79A; --accent-soft:#14301F;
+    --warn:#E0AA51; --warn-soft:#33280F;
+    --crit:#F07C70; --crit-soft:#371A17;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0F1210; --surface:#171B18; --surface-2:#1E231F;
+  --ink:#E7EBE6; --ink-2:#AEB7B0; --ink-3:#828C86;
+  --rule:#2A302B; --rule-2:#3B433D;
+  --accent:#5CC79A; --accent-soft:#14301F;
+  --warn:#E0AA51; --warn-soft:#33280F;
+  --crit:#F07C70; --crit-soft:#371A17;
+}
+
+*{box-sizing:border-box;}
+body{background:var(--ground);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+button,input,textarea,select{font:inherit;color:inherit;}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+.wrap{max-width:720px;margin:0 auto;padding:20px 16px 64px;display:flex;flex-direction:column;gap:20px;}
+
+/* Malay line under an English label. Only rendered where the two differ. */
+.bm{display:block;font-family:var(--f-mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.02em;line-height:1.35;margin-top:2px;}
+.grp.is-issue .bm{color:var(--crit);opacity:.72;}
+
+.top{display:flex;flex-direction:column;gap:12px;}
+.eyebrow{font-family:var(--f-mono);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);}
+.top h1{font-family:var(--f-display);font-weight:700;font-size:27px;line-height:1.08;letter-spacing:-.02em;margin:0;}
+.daterow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.daterow label{font-family:var(--f-mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);}
+input[type=date]{background:var(--surface);border:1px solid var(--rule);padding:7px 10px;border-radius:3px;font-family:var(--f-mono);font-size:13px;}
+.hari{font-family:var(--f-mono);font-size:12px;color:var(--ink-2);}
+
+.banner{padding:11px 14px;border-radius:3px;font-size:14px;background:var(--warn-soft);color:var(--warn);border:1px solid var(--rule);}
+.banner.is-ok{background:var(--accent-soft);color:var(--accent);}
+.banner.is-bad{background:var(--crit-soft);color:var(--crit);}
+
+.tabs{display:flex;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden;}
+.tab{flex:1;background:var(--surface);border:none;padding:9px 6px;cursor:pointer;font-family:var(--f-mono);font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);line-height:1.25;}
+.tab[aria-selected="true"]{background:var(--accent);color:#fff;}
+.tbm{display:block;font-size:9px;font-weight:400;letter-spacing:.03em;text-transform:none;opacity:.72;margin-top:2px;}
+
+.people{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden;}
+.pbtn{background:var(--surface);border:none;padding:12px 6px;cursor:pointer;display:flex;flex-direction:column;gap:3px;align-items:center;}
+.pbtn[aria-pressed="true"]{background:var(--accent-soft);}
+.pbtn b{font-family:var(--f-display);font-weight:600;font-size:14px;color:var(--ink);}
+.pbtn[aria-pressed="true"] b{color:var(--accent);}
+.pbtn em{font-style:normal;font-family:var(--f-mono);font-size:9px;font-weight:600;letter-spacing:.05em;}
+.dot-y{color:var(--accent);} .dot-n{color:var(--rule-2);}
+
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:3px;overflow:hidden;}
+.card-h{padding:14px 16px;border-bottom:1px solid var(--rule);background:var(--surface-2);display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;}
+.card-h b{font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:-.01em;}
+.card-h span{font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);text-align:right;}
+.grp{padding:14px 16px;border-bottom:1px solid var(--rule);display:flex;flex-direction:column;gap:10px;}
+.grp:last-child{border-bottom:none;}
+.grp.is-issue{background:var(--crit-soft);}
+.grp-t{font-family:var(--f-mono);font-size:10px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);}
+.grp.is-issue .grp-t{color:var(--crit);}
+.grp-t .bm{text-transform:none;letter-spacing:.02em;font-weight:400;font-size:10px;margin-top:3px;}
+.grp-n{font-size:13px;color:var(--ink-3);line-height:1.4;margin-top:-4px;}
+
+.nrow{display:flex;align-items:center;gap:12px;}
+.nrow label{flex:1;font-size:15px;color:var(--ink-2);line-height:1.3;}
+.nrow input{width:74px;flex:none;text-align:center;background:var(--ground);border:1px solid var(--rule-2);border-radius:3px;padding:9px 6px;font-family:var(--f-mono);font-size:16px;font-variant-numeric:tabular-nums;}
+.nrow input:focus{border-color:var(--accent);background:var(--surface);}
+.unit{font-style:normal;font-family:var(--f-mono);font-size:10px;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;}
+.minlab{font-family:var(--f-mono);font-size:10px;color:var(--ink-3);width:52px;text-align:right;flex:none;letter-spacing:.04em;}
+.nrow.is-low label{color:var(--crit);font-weight:600;}
+.nrow.is-low .bm{color:var(--crit);opacity:.72;}
+.nrow.is-low input{border-color:var(--crit);background:var(--crit-soft);color:var(--crit);font-weight:600;}
+.nrow.is-low .minlab{color:var(--crit);font-weight:600;}
+.nrow.is-low .unit{color:var(--crit);}
+
+.setg{border-top:1px dashed var(--rule-2);padding-top:11px;margin-top:2px;}
+.setg summary{cursor:pointer;font-family:var(--f-mono);font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);}
+.setg[open] summary{margin-bottom:10px;}
+.setg .grp-n{margin:0 0 10px;}
+.setrow{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+.setrow label{flex:1;font-size:14px;color:var(--ink-2);}
+.setrow input{width:70px;flex:none;text-align:center;background:var(--ground);border:1px solid var(--rule-2);border-radius:3px;padding:7px 6px;font-family:var(--f-mono);font-size:14px;font-variant-numeric:tabular-nums;}
+.minbtn{width:100%;padding:9px;border:1px solid var(--rule-2);border-radius:3px;background:var(--surface-2);color:var(--ink-2);font-family:var(--f-mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;}
+
+.crow{display:flex;align-items:flex-start;gap:11px;cursor:pointer;padding:2px 0;}
+.crow input{width:21px;height:21px;flex:none;margin:1px 0 0;accent-color:var(--accent);cursor:pointer;}
+.grp.is-issue .crow input{accent-color:var(--crit);}
+.crow span{font-size:15px;color:var(--ink-2);line-height:1.3;}
+.crow input:checked + span{color:var(--ink);font-weight:600;}
+.crow.is-due{background:var(--accent-soft);border-radius:3px;padding:9px 10px;}
+.crow.is-due span{color:var(--ink);}
+.crow.is-due .bm{color:var(--accent);opacity:.8;}
+.duebadge{display:inline-block;margin-top:5px;font-family:var(--f-mono);font-size:9px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#fff;background:var(--accent);padding:2px 6px;border-radius:2px;}
+
+textarea{width:100%;min-height:72px;background:var(--ground);border:1px solid var(--rule-2);border-radius:3px;padding:10px 11px;font-family:var(--f-body);font-size:15px;resize:vertical;}
+textarea:focus{border-color:var(--accent);background:var(--surface);}
+.grp.is-issue textarea{background:var(--surface);}
+
+.save{width:100%;padding:14px;border:none;border-radius:3px;background:var(--accent);color:#fff;font-family:var(--f-display);font-weight:600;font-size:15px;cursor:pointer;}
+.save:disabled{background:var(--rule-2);cursor:not-allowed;}
+.saveline{font-family:var(--f-mono);font-size:11px;color:var(--ink-3);text-align:center;}
+
+.rev{display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden;}
+.revrow{background:var(--surface);padding:13px 15px;display:flex;flex-direction:column;gap:7px;}
+.revtop{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.revtop b{font-family:var(--f-display);font-weight:600;font-size:15px;flex:1;}
+.pill{font-family:var(--f-mono);font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:2px;}
+.pill-y{background:var(--accent-soft);color:var(--accent);}
+.pill-n{background:var(--surface-2);color:var(--ink-3);}
+.pill-w{background:var(--crit-soft);color:var(--crit);}
+.pill-a{background:var(--warn-soft);color:var(--warn);}
+.revnums{font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2);line-height:1.65;}
+.revissue{font-size:14.5px;color:var(--crit);background:var(--crit-soft);padding:9px 11px;border-radius:3px;line-height:1.45;}
+.revissue b{font-weight:600;}
+.revmiss{font-family:var(--f-mono);font-size:11px;color:var(--warn);line-height:1.5;}
+.revadhoc{font-size:14.5px;color:var(--ink-2);background:var(--surface-2);padding:9px 11px;border-radius:3px;line-height:1.45;border-left:2px solid var(--rule-2);}
+.revadhoc b{font-family:var(--f-mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);}
+
+.wk{width:100%;border-collapse:collapse;background:var(--surface);}
+.wk th{font-family:var(--f-mono);font-size:9.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);padding:9px 4px;border-bottom:1px solid var(--rule-2);background:var(--surface-2);}
+.wk th:first-child{text-align:left;padding-left:13px;}
+.wk td{padding:11px 4px;border-bottom:1px solid var(--rule);text-align:center;}
+.wk td:first-child{text-align:left;padding-left:13px;font-family:var(--f-display);font-weight:600;font-size:14px;color:var(--ink);}
+.wk tr:last-child td{border-bottom:none;}
+.mk{font-family:var(--f-mono);font-size:13px;font-weight:600;}
+.mk-y{color:var(--accent);} .mk-p{color:var(--crit);} .mk-n{color:var(--rule-2);}
+.legend{font-family:var(--f-mono);font-size:10.5px;color:var(--ink-3);line-height:1.7;}
+
+.tally{display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:3px;overflow:hidden;}
+.tal{background:var(--surface);padding:10px 15px;display:flex;justify-content:space-between;align-items:baseline;gap:12px;}
+.tal span{font-size:14.5px;color:var(--ink-2);}
+.tal b{font-family:var(--f-mono);font-size:15px;font-weight:600;color:var(--crit);font-variant-numeric:tabular-nums;}
+.sub{font-family:var(--f-mono);font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin:18px 0 8px;}
+.note{font-size:14px;color:var(--ink-2);line-height:1.5;}
+
+@media (max-width:420px){ .people{grid-template-columns:repeat(2,1fr);} .top h1{font-size:23px;} .minlab{display:none;} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <div class="eyebrow">ReLive Pharmacy &amp; Medtech &middot; Warehouse Operations</div>
+    <h1>Daily Checklist</h1>
+    <div class="daterow">
+      <label for="tarikh">Date &middot; Tarikh</label>
+      <input type="date" id="tarikh">
+      <span class="hari" id="hari"></span>
+      <button class="minbtn" id="refreshBtn" style="width:auto;padding:7px 12px">Refresh &middot; Muat semula</button>
+      <button class="minbtn" id="xlsDayBtn" style="width:auto;padding:7px 12px">Export Excel &middot; hari ini</button>
+    </div>
+  </div>
+
+  <div id="banner" class="banner">Connecting to storage&hellip;</div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="t-isi" aria-selected="true">My Checklist<span class="tbm">Checklist Saya</span></button>
+    <button class="tab" role="tab" id="t-semak" aria-selected="false">Closing Review<span class="tbm">Semakan Penutup</span></button>
+    <button class="tab" role="tab" id="t-minggu" aria-selected="false">This Week<span class="tbm">Minggu Ini</span></button>
+  </div>
+
+  <div id="pane-isi">
+    <div class="people" id="people"></div>
+    <div id="form" style="margin-top:20px"></div>
+  </div>
+
+  <div id="pane-semak" hidden></div>
+  <div id="pane-minggu" hidden></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* `bm` is the Malay line shown under the English label. It is omitted wherever the
+     two read the same (picking, packing, closing stock, Shopee ...) so the form stays short. */
+
+  var RUTIN = {t:"Routine tasks — done today?", bm:"Tugasan rutin — sudah dibuat?"};
+  var BERKALA = [
+    {k:"stockcount", t:"Stock count, own racks (weekly)", bm:"Stock count rak sendiri (mingguan)"},
+    {k:"stocktake",  t:"Stocktake (monthly)",             bm:"Stocktake (bulanan)"}
+  ];
+  /* Shared by Aisar, Azmi & Idham - labels must match exactly so the weekly tally can add them up. */
+  var COLD = {
+    t:"Cold chain problems", bm:"Masalah cold chain", type:"issue",
+    n:"Tick only what happened today.", nbm:"Tanda yang berlaku hari ni sahaja.",
+    items:[
+      {k:"cc_ice",    t:"Ice pack short or already melted", bm:"Ice pack tak cukup / dah cair"},
+      {k:"cc_transit",t:"Problem during transit",           bm:"Masalah semasa transit"},
+      {k:"cc_lambat", t:"Late arrival at clinic",           bm:"Lambat sampai klinik"},
+      {k:"cc_hold",   t:"Held at transit hub",              bm:"Hold di hub transit"}
+    ]
+  };
+  /* Shared by all four. */
+  var ADHOC = {
+    t:"Ad-hoc work today", bm:"Kerja adhoc hari ni", type:"text",
+    items:[{k:"adhoc", ph:"Work outside your routine — who asked, how long it took.\nKerja luar rutin — siapa minta, berapa lama. Kalau tiada, biar kosong."}]
+  };
+
+  /* Default reorder levels. Editable under "Reorder levels" and saved for everyone. */
+  var ALAT = [
+    {k:"celotape", t:"Cellotape",   unit:"roll", def:5},
+    {k:"zipper",   t:"Zipper bag",  unit:"pcs",  def:100},
+    {k:"kotak",    t:"Packing box", unit:"pcs",  def:50, bm:"Kotak packing"},
+    {k:"icepack",  t:"Ice pack",    unit:"pcs",  def:30},
+    {k:"icebox",   t:"Ice box",     unit:"unit", def:5}
+  ];
+
+  var PEOPLE = [
+    {
+      id:"aisar", nama:"Aisar", bidang:"Dispatch", bidangbm:"Penghantaran",
+      groups:[
+        {t:"Today's numbers", bm:"Nombor hari ini", type:"num", items:[
+          {k:"pack",     t:"Orders picked &amp; packed",        bm:"Pesanan di-pick &amp; pack"},
+          {k:"lalamove", t:"Lalamove deliveries",               bm:"Penghantaran Lalamove"},
+          {k:"ninjavan", t:"Ninjavan deliveries",               bm:"Penghantaran Ninjavan"},
+          {k:"tertunda", t:"Orders that missed dispatch today", bm:"Pesanan tak sempat keluar hari ni"},
+          {k:"hold_qty", t:"Orders on hold &mdash; current total, not just new ones today",
+                         bm:"Order sedang hold — jumlah semasa, bukan yang baharu hari ni"}
+        ]},
+        {t:RUTIN.t, bm:RUTIN.bm, type:"check", items:[
+          {k:"pickpack",  t:"Picking &amp; packing"},
+          {k:"dispatch",  t:"Dispatch items to Lalamove",                bm:"Dispatch item ke Lalamove"},
+          {k:"fifo",      t:"Arrange medicines per SOP, FIFO &amp; FEFO",bm:"Susun ubat ikut SOP, FIFO &amp; FEFO"},
+          {k:"arrange",   t:"Arrange delivery (Lalamove / Ninjavan)"},
+          {k:"kotak",     t:"Dispose boxes",                             bm:"Dispose kotak"},
+          {k:"closing",   t:"Closing stock"},
+          {k:"cleaning",  t:"Clean warehouse",                           bm:"Cleaning warehouse"}
+        ]},
+        {t:"Delivery problems", bm:"Masalah penghantaran", type:"issue",
+         n:"Tick only what happened today.", nbm:"Tanda yang berlaku hari ni sahaja.", items:[
+          {k:"lambat",   t:"Delivery update came late",           bm:"Update lambat sampai"},
+          {k:"tak_smp",  t:"Not delivered to customer",           bm:"Tak sampai pada customer"},
+          {k:"tutup",    t:"Clinic closed",                       bm:"Klinik tutup"},
+          {k:"topup",    t:"Lalamove top-up needed",              bm:"Perlu topup Lalamove"},
+          {k:"tracking", t:"Tracking sharing problem",            bm:"Masalah tracking sharing"},
+          {k:"hold",     t:"Order held (warehouse / safehouse)",  bm:"Hold order (warehouse / safehouse)"}
+        ]},
+        COLD,
+        {t:"Problem details", bm:"Butiran masalah", type:"text", items:[
+          {k:"problem", ph:"Which clinic, which order, what happened.\nKlinik mana, order nombor berapa, apa yang jadi. Kalau tiada, biar kosong."}
+        ]},
+        ADHOC,
+        {t:"Weekly &amp; monthly", bm:"Mingguan &amp; bulanan", type:"check", items:BERKALA}
+      ]
+    },
+    {
+      id:"azmi", nama:"Azmi", bidang:"Receiving &amp; Racking", bidangbm:"Terimaan &amp; Susunan Rak",
+      groups:[
+        {t:"Today's numbers", bm:"Nombor hari ini", type:"num", items:[
+          {k:"pack",    t:"Orders picked &amp; packed",     bm:"Pesanan di-pick &amp; pack"},
+          {k:"terima",  t:"Supplier deliveries received",   bm:"Penghantaran supplier diterima"},
+          {k:"gagal",   t:"Items that failed inspection",   bm:"Item tak lulus inspect"}
+        ]},
+        {t:RUTIN.t, bm:RUTIN.bm, type:"check", items:[
+          {k:"pickpack", t:"Picking &amp; packing"},
+          {k:"receive",  t:"Receiving &amp; inspecting items",           bm:"Receiving &amp; inspect item"},
+          {k:"susun",    t:"Put stock on its assigned rack",             bm:"Susun stock pada rak yang ditetapkan"},
+          {k:"fifo",     t:"Arrange medicines per SOP, FIFO &amp; FEFO", bm:"Susun ubat ikut SOP, FIFO &amp; FEFO"},
+          {k:"kotak",    t:"Dispose boxes",                              bm:"Dispose kotak"},
+          {k:"hold",     t:"Update held orders (safehouse / warehouse)", bm:"Update hold order (safehouse / warehouse)"},
+          {k:"cleaning", t:"Clean warehouse",                            bm:"Cleaning warehouse"}
+        ]},
+        {t:"Racking problems", bm:"Masalah susunan stock", type:"issue",
+         n:"Tick only what happened today.", nbm:"Tanda yang berlaku hari ni sahaja.", items:[
+          {k:"tak_muat", t:"Stock does not fit the rack", bm:"Rak tak muat"},
+          {k:"penuh",    t:"Rack full",                   bm:"Rak penuh"},
+          {k:"lebih",    t:"Excess stock",                bm:"Stock berlebihan"}
+        ]},
+        COLD,
+        {t:"Problem details", bm:"Butiran masalah", type:"text", items:[
+          {k:"problem", ph:"Which rack, which item, how much excess.\nRak mana, item apa, berapa banyak lebih. Kalau tiada, biar kosong."}
+        ]},
+        ADHOC,
+        {t:"Weekly &amp; monthly", bm:"Mingguan &amp; bulanan", type:"check", items:BERKALA}
+      ]
+    },
+    {
+      id:"idham", nama:"Idham", bidang:"Operations Supervisor", bidangbm:"Penyelia Operasi",
+      groups:[
+        {t:"Today's numbers", bm:"Nombor hari ini", type:"num", items:[
+          {k:"pack",        t:"Orders picked &amp; packed",   bm:"Pesanan di-pick &amp; pack"},
+          {k:"terima",      t:"Supplier deliveries received", bm:"Penghantaran supplier diterima"},
+          {k:"inv_tangguh", t:"Invoices outstanding",         bm:"Invoice tertangguh"}
+        ]},
+        {t:RUTIN.t, bm:RUTIN.bm, type:"check", items:[
+          {k:"pickpack", t:"Picking &amp; packing"},
+          {k:"receive",  t:"Receiving &amp; inspecting items",           bm:"Receiving &amp; inspect item"},
+          {k:"fifo",     t:"Arrange medicines per SOP, FIFO &amp; FEFO", bm:"Susun ubat ikut SOP, FIFO &amp; FEFO"},
+          {k:"arrange",  t:"Arrange delivery (Lalamove / Ninjavan)"},
+          {k:"alat",     t:"Consumables checklist updated (including ice boxes returned)",
+                         bm:"Checklist alat kegunaan dikemas kini (termasuk ice box yang dipulangkan)"},
+          {k:"kotak",    t:"Dispose boxes",                              bm:"Dispose kotak"},
+          {k:"hold",     t:"Update held orders (safehouse / warehouse)", bm:"Update hold order (safehouse / warehouse)"},
+          {k:"cleaning", t:"Clean warehouse",                            bm:"Cleaning warehouse"}
+        ]},
+        {t:"Consumables &mdash; balance today", bm:"Alat kegunaan — baki hari ini", type:"stock",
+         n:"Enter the real balance. The box turns red at the reorder level — that means order now.",
+         nbm:"Isi baki sebenar. Kotak jadi merah bila sampai paras reorder — maksudnya perlu order segera.",
+         items:ALAT},
+        COLD,
+        {t:"Daily problems", bm:"Masalah harian", type:"issue",
+         n:"Tick only what happened today.", nbm:"Tanda yang berlaku hari ni sahaja.", items:[
+          {k:"inv",       t:"Invoice outstanding",                        bm:"Invoice tertangguh"},
+          {k:"tak_cukup", t:"Item short",                                 bm:"Item tak cukup"},
+          {k:"rosak",     t:"Item damaged",                               bm:"Item rosak"},
+          {k:"expired",   t:"Item expired"},
+          {k:"return",    t:"Item returned",                              bm:"Item return"},
+          {k:"tak_tally", t:"Stock does not tally (physical vs system)",  bm:"Stock tak tally (physical vs system)"},
+          {k:"lebih",     t:"Excess stock",                               bm:"Stock berlebihan"}
+        ]},
+        {t:"Problem details", bm:"Butiran masalah", type:"text", items:[
+          {k:"problem", ph:"Which item, how many, root cause.\nItem apa, berapa banyak, punca. Kalau tiada, biar kosong."}
+        ]},
+        ADHOC,
+        {t:"Weekly &amp; monthly", bm:"Mingguan &amp; bulanan", type:"check", items:BERKALA}
+      ]
+    },
+    {
+      id:"erfa", nama:"Erfa", bidang:"Documentation &amp; Helpdesk", bidangbm:"Dokumentasi &amp; Helpdesk",
+      groups:[
+        {t:"Today's numbers", bm:"Nombor hari ini", type:"num", items:[
+          {k:"invoice",  t:"Invoices issued",              bm:"Invoice dikeluarkan"},
+          {k:"payment",  t:"Payment entries recorded",     bm:"Payment entry direkod"},
+          {k:"supplier", t:"Suppliers that delivered today", bm:"Supplier hantar barang hari ni"},
+          {k:"shopee",   t:"Shopee orders",                bm:"Pesanan Shopee"},
+          {k:"sku",      t:"New items / SKUs added",       bm:"Item baharu / SKU ditambah"},
+          {k:"helpdesk", t:"Helpdesk cases received",      bm:"Kes helpdesk diterima"}
+        ]},
+        {t:RUTIN.t, bm:RUTIN.bm, type:"check", items:[
+          {k:"dokumen",  t:"Documentation (invoice, payment entry)",      bm:"Dokumentasi (invoice, payment entry)"},
+          {k:"sku",      t:"Update new items / add SKUs",                 bm:"Update item baharu / penambahan SKU"},
+          {k:"list_sup", t:"Supplier delivery list updated for closing",  bm:"Senarai supplier hantar barang dikemas kini untuk closing"},
+          {k:"receive",  t:"Receiving &amp; inspecting items",            bm:"Receiving &amp; inspect item"},
+          {k:"shopee",   t:"Shopee arrangement"},
+          {k:"store",    t:"Shopee store — update stock",            bm:"Store Shopee — update stock"},
+          {k:"check",    t:"Check items before packing &amp; release",    bm:"Checking item sebelum packing &amp; release"},
+          {k:"marketing",t:"Marketing material (video / poster)"},
+          {k:"cleaning", t:"Clean warehouse",                             bm:"Cleaning warehouse"}
+        ]},
+        {t:"Shopee problems", bm:"Masalah Shopee", type:"issue",
+         n:"Tick only what happened today.", nbm:"Tanda yang berlaku hari ni sahaja.", items:[
+          {k:"sp_order",  t:"Shopee order problem",     bm:"Masalah pada order Shopee"},
+          {k:"sp_instant",t:"Shopee Instant problem",   bm:"Masalah Shopee Instant"},
+          {k:"sp_stock",  t:"Shopee stock not updated", bm:"Stock Shopee tak terkemas kini"}
+        ]},
+        {t:"Helpdesk problems", bm:"Masalah helpdesk", type:"issue",
+         n:"Tick only what happened today.", nbm:"Tanda yang berlaku hari ni sahaja.", items:[
+          {k:"order",    t:"Order problem",   bm:"Masalah pada order"},
+          {k:"complaint",t:"Clinic complaint",bm:"Complaint dari klinik"},
+          {k:"tak_cukup",t:"Items short",     bm:"Barang tak cukup"},
+          {k:"salah",    t:"Ordering error",  bm:"Kesalahan ordering"}
+        ]},
+        {t:"Problem details", bm:"Butiran masalah", type:"text", items:[
+          {k:"problem", ph:"Which clinic, which order, what happened.\nKlinik mana, order nombor berapa, apa yang jadi. Kalau tiada, biar kosong."}
+        ]},
+        ADHOC,
+        {t:"Weekly &amp; monthly", bm:"Mingguan &amp; bulanan", type:"check", items:BERKALA}
+      ]
+    }
+  ];
+
+  /* ============================================================
+     SETUP - fill these two in from your Supabase project.
+     Supabase dashboard -> Project Settings -> API
+       SUPABASE_URL  = "Project URL"
+       SUPABASE_KEY  = the "anon / public" key (NOT the service_role key)
+     Anyone with this page's link can read and write the checklist,
+     exactly like a Google Form. Do not put anything confidential in it.
+     ============================================================ */
+  var SUPABASE_URL = "https://YOUR-PROJECT.supabase.co";
+  var SUPABASE_KEY = "YOUR-ANON-KEY";
+
+  var HARI = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  var ready = false, configured = (SUPABASE_URL.indexOf("YOUR-PROJECT") < 0 && SUPABASE_KEY.indexOf("YOUR-ANON") < 0);
+  var rows = {}, mins = {}, tab = "isi", person = null, saving = false;
+
+  function api(path, opts){
+    opts = opts || {};
+    opts.headers = Object.assign({
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + SUPABASE_KEY,
+      "Content-Type": "application/json"
+    }, opts.headers || {});
+    return fetch(SUPABASE_URL.replace(/\/+$/,"") + "/rest/v1/" + path, opts).then(function(r){
+      if (!r.ok) return r.text().then(function(t){ throw new Error(r.status + " " + t.slice(0,160)); });
+      return r;
+    });
+  }
+
+  ALAT.forEach(function(a){ mins[a.k] = a.def; });
+
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+  function plain(s){ return String(s).replace(/&amp;/g,"&").replace(/&mdash;/g,"—").replace(/&ndash;/g,"–").replace(/&middot;/g,"·"); }
+  function bmLine(x){ return x && x.bm ? '<span class="bm">'+x.bm+'</span>' : ''; }
+  function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+  function parseYmd(s){ var p=s.split("-"); return new Date(+p[0],+p[1]-1,+p[2]); }
+  function key(d,p){ return d+"__"+p; }
+  function byId(i){ return document.getElementById(i); }
+  function P(id){ return PEOPLE.filter(function(x){return x.id===id;})[0]; }
+  function groupsOf(p,type){ return p.groups.filter(function(g){return g.type===type;}); }
+  function num(v){ return (v===0||v) ? v : null; }
+  /* Periodic tasks only light up on the day they are actually due, so they stand out
+     then and stay quiet the rest of the time. Wednesday is the protected count day. */
+  function dueToday(k, dateStr){
+    var d = parseYmd(dateStr);
+    if (k === "stockcount") return d.getDay() === 3;
+    if (k === "stocktake"){
+      var lastDay = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+      return (lastDay - d.getDate()) < 7;
+    }
+    return false;
+  }
+
+  var el = {
+    tarikh:byId("tarikh"), hari:byId("hari"), banner:byId("banner"),
+    people:byId("people"), form:byId("form"),
+    paneIsi:byId("pane-isi"), paneSemak:byId("pane-semak"), paneMinggu:byId("pane-minggu")
+  };
+
+  var today = ymd(new Date()), date = today;
+  el.tarikh.value = date; el.tarikh.max = today;
+
+  try { var l = localStorage.getItem("ch_person"); if (l && P(l)) person = l; } catch(e){}
+  if (!person) person = PEOPLE[0].id;
+
+  function windowDates(){
+    var out=[], d=parseYmd(date);
+    for (var i=6;i>=0;i--){ var x=new Date(d); x.setDate(d.getDate()-i); out.push(ymd(x)); }
+    return out;
+  }
+
+  function setBanner(msg, cls){
+    el.banner.textContent = msg;
+    el.banner.className = "banner" + (cls?" "+cls:"");
+    el.banner.hidden = !msg;
+  }
+
+  /* One fetch per load, per date change, per tab switch and after each save.
+     No live stream, so a second person's entry appears when you switch tab or press Refresh. */
+  function loadAll(){
+    if (!configured){
+      setBanner("Not set up yet — open this file and fill in SUPABASE_URL and SUPABASE_KEY. · Belum disetkan.", "is-bad");
+      render();
+      return Promise.resolve();
+    }
+    var w = windowDates();
+    return Promise.all([
+      api("entries?select=*&date=gte."+w[0]+"&date=lte."+w[6]).then(function(r){ return r.json(); }),
+      api("settings?select=*&key=eq.reorder").then(function(r){ return r.json(); })
+    ]).then(function(res){
+      rows = {};
+      (res[0]||[]).forEach(function(b){
+        if (b.date && b.person) rows[key(String(b.date).slice(0,10), b.person)] = b;
+      });
+      var st = (res[1]||[])[0];
+      if (st && st.value){
+        ALAT.forEach(function(a){ if (typeof st.value[a.k] === "number") mins[a.k] = st.value[a.k]; });
+      }
+      ready = true;
+      el.banner.hidden = true;
+      render();
+    }).catch(function(err){
+      ready = false;
+      setBanner("Cannot reach storage · Tidak dapat sambung: " + err.message + " — entries will NOT be saved.", "is-bad");
+      render();
+    });
+  }
+
+  function current(){ return rows[key(date,person)] || null; }
+
+  function collect(){
+    var p = P(person), nums={}, checks={}, issues={}, texts={}, stock={};
+    p.groups.forEach(function(g){
+      g.items.forEach(function(it){
+        var f = byId(g.type+"_"+it.k);
+        if (!f) return;
+        if (g.type==="num")        nums[it.k]   = f.value!=="" ? Number(f.value) : null;
+        else if (g.type==="stock") stock[it.k]  = f.value!=="" ? Number(f.value) : null;
+        else if (g.type==="check") checks[it.k] = !!f.checked;
+        else if (g.type==="issue") issues[it.k] = !!f.checked;
+        else                       texts[it.k]  = f.value.trim();
+      });
+    });
+    return { id:key(date,person), person:person, date:date, nums:nums, checks:checks,
+             issues:issues, texts:texts, stock:stock, updated_at:new Date().toISOString() };
+  }
+
+  var UPSERT = {"Prefer":"resolution=merge-duplicates,return=minimal"};
+
+  function save(){
+    if (!ready || saving) return;
+    saving = true;
+    var body = collect(), btn = byId("saveBtn");
+    if (btn){ btn.disabled = true; btn.textContent = "Saving…"; }
+    api("entries", {method:"POST", headers:UPSERT, body:JSON.stringify(body)}).then(function(){
+      saving = false; rows[key(date,person)] = body; render();
+    }).catch(function(err){
+      saving = false;
+      setBanner("Could not save · Gagal simpan: "+err.message, "is-bad");
+      if (btn){ btn.disabled=false; btn.textContent="Save · Simpan"; }
+    });
+  }
+
+  function saveMins(){
+    if (!ready) return;
+    var value = {};
+    ALAT.forEach(function(a){
+      var f = byId("min_"+a.k);
+      value[a.k] = (f && f.value!=="") ? Number(f.value) : a.def;
+    });
+    var btn = byId("minBtn");
+    if (btn){ btn.disabled = true; btn.textContent = "Saving…"; }
+    api("settings", {method:"POST", headers:UPSERT, body:JSON.stringify({key:"reorder", value:value})}).then(function(){
+      ALAT.forEach(function(a){ mins[a.k] = value[a.k]; });
+      render();
+    }).catch(function(err){
+      setBanner("Could not save levels · Gagal simpan paras: "+err.message, "is-bad");
+      if (btn){ btn.disabled = false; btn.textContent = "Save levels · Simpan paras"; }
+    });
+  }
+
+  /* -------- render -------- */
+  function render(){
+    el.paneIsi.hidden = tab!=="isi";
+    el.paneSemak.hidden = tab!=="semak";
+    el.paneMinggu.hidden = tab!=="minggu";
+    byId("t-isi").setAttribute("aria-selected", tab==="isi");
+    byId("t-semak").setAttribute("aria-selected", tab==="semak");
+    byId("t-minggu").setAttribute("aria-selected", tab==="minggu");
+    el.hari.textContent = HARI[parseYmd(date).getDay()] + (date===today ? " · today / hari ini" : "");
+    if (tab==="isi"){ renderPeople(); renderForm(); }
+    else if (tab==="semak") renderSemak();
+    else renderMinggu();
+  }
+
+  function renderPeople(){
+    el.people.innerHTML = PEOPLE.map(function(p){
+      var done = !!rows[key(date,p.id)];
+      return '<button class="pbtn" aria-pressed="'+(p.id===person)+'" data-p="'+p.id+'">'
+        +'<b>'+esc(p.nama)+'</b><em class="'+(done?"dot-y":"dot-n")+'">'+(done?"● SIAP":"○ BELUM")+'</em></button>';
+    }).join("");
+    Array.prototype.forEach.call(el.people.querySelectorAll(".pbtn"), function(b){
+      b.onclick = function(){
+        person = b.getAttribute("data-p");
+        try{ localStorage.setItem("ch_person", person); }catch(e){}
+        render();
+      };
+    });
+  }
+
+  function lowRow(it, v){
+    var min = mins[it.k];
+    return (v!=="" && v!==null && Number(v) <= min);
+  }
+
+  function renderForm(){
+    var p = P(person), cur = current();
+    var nums = cur&&cur.nums?cur.nums:{}, checks = cur&&cur.checks?cur.checks:{},
+        issues = cur&&cur.issues?cur.issues:{}, texts = cur&&cur.texts?cur.texts:{},
+        stock = cur&&cur.stock?cur.stock:{};
+
+    var body = p.groups.map(function(g){
+      var inner;
+      if (g.type==="num"){
+        inner = g.items.map(function(it){
+          var v = num(nums[it.k]); v = v===null ? "" : v;
+          return '<div class="nrow"><label for="num_'+it.k+'">'+it.t+bmLine(it)+'</label>'
+               + '<input type="number" min="0" inputmode="numeric" id="num_'+it.k+'" value="'+v+'"></div>';
+        }).join("");
+      } else if (g.type==="stock"){
+        inner = g.items.map(function(it){
+          var v = num(stock[it.k]); v = v===null ? "" : v;
+          return '<div class="nrow'+(lowRow(it,v)?" is-low":"")+'" id="row_'+it.k+'">'
+               + '<label for="stock_'+it.k+'">'+it.t+' <em class="unit">'+it.unit+'</em>'+bmLine(it)+'</label>'
+               + '<input type="number" min="0" inputmode="numeric" id="stock_'+it.k+'" value="'+v+'" data-alat="'+it.k+'">'
+               + '<span class="minlab">min '+mins[it.k]+'</span></div>';
+        }).join("")
+        + '<details class="setg"><summary>Reorder levels · Paras reorder</summary>'
+        + '<div class="grp-n">Shared by everyone. Set them from real usage and supplier lead time — the current figures are only a starting guess.'
+        + '<span class="bm">Dikongsi semua. Tetapkan ikut penggunaan sebenar dan masa tunggu supplier — angka sedia ada hanyalah anggaran.</span></div>'
+        + ALAT.map(function(a){
+            return '<div class="setrow"><label for="min_'+a.k+'">'+a.t+' <em class="unit">'+a.unit+'</em></label>'
+                 + '<input type="number" min="0" inputmode="numeric" id="min_'+a.k+'" value="'+mins[a.k]+'"></div>';
+          }).join("")
+        + '<button class="minbtn" id="minBtn"'+(ready?"":" disabled")+'>Save levels · Simpan paras</button></details>';
+      } else if (g.type==="check" || g.type==="issue"){
+        var src = g.type==="check" ? checks : issues;
+        inner = g.items.map(function(it){
+          var due = (g.type==="check") && dueToday(it.k, date);
+          return '<label class="crow'+(due?" is-due":"")+'"><input type="checkbox" id="'+g.type+'_'+it.k+'"'+(src[it.k]?" checked":"")+'>'
+               + '<span>'+it.t+bmLine(it)
+               + (due?'<span class="duebadge">Due today · Hari ini</span>':'')+'</span></label>';
+        }).join("");
+      } else {
+        inner = g.items.map(function(it){
+          return '<textarea id="text_'+it.k+'" placeholder="'+esc(it.ph||"")+'">'+esc(texts[it.k]||"")+'</textarea>';
+        }).join("");
+      }
+      return '<div class="grp'+(g.type==="issue"?" is-issue":"")+'">'
+           + '<div class="grp-t">'+g.t+bmLine(g)+'</div>'
+           + (g.n?'<div class="grp-n">'+g.n+(g.nbm?'<span class="bm">'+g.nbm+'</span>':'')+'</div>':'')
+           + inner + '</div>';
+    }).join("");
+
+    el.form.innerHTML = '<div class="card">'
+      + '<div class="card-h"><b>'+esc(p.nama)+'</b><span>'+p.bidang+(p.bidangbm?'<span class="bm">'+p.bidangbm+'</span>':'')+'</span></div>'
+      + body
+      + '<div class="grp"><button class="save" id="saveBtn"'+(ready?"":" disabled")+'>'+(cur?"Update · Kemas kini":"Save · Simpan")+'</button>'
+      + '<div class="saveline" id="saveLine">'
+      + (cur ? "Saved · Disimpan "+new Date((cur.updated_at||cur.updatedAt)).toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit"})
+             : (ready?"Not saved yet · Belum disimpan untuk tarikh ini.":"Storage unavailable · Simpanan tidak tersedia."))
+      + '</div></div></div>';
+
+    var btn = byId("saveBtn"); if (btn) btn.onclick = save;
+    var mbtn = byId("minBtn"); if (mbtn) mbtn.onclick = saveMins;
+
+    /* Red state updates as you type, without having to save first. */
+    Array.prototype.forEach.call(el.form.querySelectorAll("input[data-alat]"), function(f){
+      f.addEventListener("input", function(){
+        var k = f.getAttribute("data-alat"), row = byId("row_"+k);
+        if (row) row.className = "nrow" + (lowRow({k:k}, f.value) ? " is-low" : "");
+      });
+    });
+    Array.prototype.forEach.call(el.form.querySelectorAll(".card > .grp input, .card > .grp textarea"), function(f){
+      f.addEventListener("input", function(){
+        var b=byId("saveBtn"); if(b) b.textContent="Save · Simpan";
+        var s=byId("saveLine"); if(s) s.textContent="Not saved · Belum disimpan — press Save.";
+      });
+    });
+  }
+
+  function issuesOf(p, r){
+    if (!r || !r.issues) return [];
+    var out = [];
+    groupsOf(p,"issue").forEach(function(g){
+      g.items.forEach(function(it){ if (r.issues[it.k]) out.push({g:g.t, t:it.t}); });
+    });
+    return out;
+  }
+  /* Consumables at or below their reorder level - reported like a problem, but they don't flag the day. */
+  function lowOf(p, r){
+    if (!r || !r.stock) return [];
+    var out = [];
+    groupsOf(p,"stock").forEach(function(g){
+      g.items.forEach(function(it){
+        var v = num(r.stock[it.k]);
+        if (v !== null && v <= mins[it.k]) out.push({t:it.t, v:v, min:mins[it.k], unit:it.unit});
+      });
+    });
+    return out;
+  }
+  function flagged(p, r){ return !!r && (issuesOf(p,r).length > 0 || (r.texts && r.texts.problem)); }
+
+  function renderSemak(){
+    var adaMasalah = [], belum = [], adaAdhoc = [], perluOrder = [], terlepas = [];
+    var body = PEOPLE.map(function(p){
+      var r = rows[key(date,p.id)];
+      if (!r) belum.push(p.nama);
+      var iss = issuesOf(p,r), low = lowOf(p,r);
+      if (iss.length || (r && r.texts && r.texts.problem)) adaMasalah.push(p.nama);
+      if (r && r.texts && r.texts.adhoc) adaAdhoc.push(p.nama);
+      low.forEach(function(x){ perluOrder.push(plain(x.t)); });
+
+      var pills = r ? '<span class="pill pill-y">Done · Siap</span>' : '<span class="pill pill-n">Not filled · Belum</span>';
+      if (iss.length) pills += ' <span class="pill pill-w">'+iss.length+' problem'+(iss.length>1?"s":"")+'</span>';
+      if (low.length) pills += ' <span class="pill pill-w">'+low.length+' to reorder</span>';
+      if (r && r.texts && r.texts.adhoc) pills += ' <span class="pill pill-a">Ad-hoc</span>';
+
+      var mid = "";
+      if (r){
+        var numLines = [];
+        groupsOf(p,"num").forEach(function(g){ g.items.forEach(function(it){
+          var v = num(r.nums && r.nums[it.k]);
+          numLines.push(plain(it.t)+": <b>"+(v===null?"—":v)+"</b>");
+        }); });
+        if (numLines.length) mid += '<div class="revnums">'+numLines.join("<br>")+'</div>';
+
+        var miss = [], missDue = [];
+        groupsOf(p,"check").forEach(function(g){ g.items.forEach(function(it){
+          if (r.checks && r.checks[it.k]) return;
+          if (dueToday(it.k, date)) missDue.push(plain(it.t)); else miss.push(plain(it.t));
+        }); });
+        if (missDue.length){
+          terlepas.push(p.nama);
+          mid += '<div class="revissue"><b>Due today, not done · Sepatutnya hari ini</b><br>'+missDue.join("<br>")+'</div>';
+        }
+        if (miss.length) mid += '<div class="revmiss">Not ticked · Belum ditanda: '+miss.join(" · ")+'</div>';
+
+        if (low.length) mid += '<div class="revissue"><b>Reorder now · Perlu order</b><br>'
+          + low.map(function(x){ return plain(x.t)+" — "+x.v+" "+x.unit+" left, level "+x.min; }).join("<br>")+'</div>';
+        if (iss.length) mid += '<div class="revissue"><b>'+iss.map(function(x){return plain(x.t);}).join(" · ")+'</b></div>';
+        if (r.texts && r.texts.problem) mid += '<div class="revissue">'+esc(r.texts.problem)+'</div>';
+        if (r.texts && r.texts.adhoc)   mid += '<div class="revadhoc"><b>Ad-hoc</b><br>'+esc(r.texts.adhoc)+'</div>';
+      }
+      return '<div class="revrow"><div class="revtop"><b>'+esc(p.nama)+'</b>'+pills+'</div>'+mid+'</div>';
+    }).join("");
+
+    var head = "";
+    if (terlepas.length) head += '<div class="banner is-bad" style="margin-bottom:14px">'
+      + '<b>Scheduled task not done · Tugasan berjadual belum dibuat</b> — '+esc(terlepas.join(", "))
+      + '. Stock count or stocktake was due today.</div>';
+    if (perluOrder.length) head += '<div class="banner is-bad" style="margin-bottom:14px"><b>Reorder now · Perlu order segera</b> — '
+      + esc(perluOrder.join(", "))+'.</div>';
+    if (adaMasalah.length) head += '<div class="banner is-bad" style="margin-bottom:14px"><b>'+adaMasalah.length
+      +' reported problems · laporkan masalah</b> — '+esc(adaMasalah.join(", "))+'.</div>';
+    if (adaAdhoc.length) head += '<div class="banner" style="margin-bottom:14px;background:var(--surface-2);color:var(--ink-2)">'
+      + '<b>Ad-hoc work · Kerja adhoc</b> — '+esc(adaAdhoc.join(", "))+'. Check whether their routine tasks slipped because of it.</div>';
+    if (belum.length) head += '<div class="banner" style="margin-bottom:14px">Not filled yet · Belum isi: <b>'+esc(belum.join(", "))+'</b></div>';
+    if (!adaMasalah.length && !belum.length && !perluOrder.length && !terlepas.length)
+      head += '<div class="banner is-ok" style="margin-bottom:14px">Everyone filled in, no problems reported · Semua sudah isi, tiada masalah.</div>';
+
+    el.paneSemak.innerHTML = head + '<div class="rev">'+body+'</div>'
+      + '<p class="note" style="margin-top:14px">Review before closing. Anything unresolved goes into tomorrow morning’s huddle.</p>';
+  }
+
+  function renderMinggu(){
+    var w = windowDates();
+    var head = '<tr><th>Person &middot; Pekerja</th>'+w.map(function(d){
+      var dd = parseYmd(d);
+      return '<th>'+HARI[dd.getDay()].slice(0,3)+'<br>'+dd.getDate()+'</th>';
+    }).join("")+'</tr>';
+
+    var body = PEOPLE.map(function(p){
+      return '<tr><td>'+esc(p.nama)+'</td>'+w.map(function(d){
+        var r = rows[key(d,p.id)];
+        if (!r) return '<td><span class="mk mk-n">–</span></td>';
+        if (flagged(p,r)) return '<td><span class="mk mk-p">!</span></td>';
+        return '<td><span class="mk mk-y">✓</span></td>';
+      }).join("")+'</tr>';
+    }).join("");
+
+    var tally = {}, total = 0;
+    w.forEach(function(d){ PEOPLE.forEach(function(p){
+      var r = rows[key(d,p.id)];
+      if (!r) return;
+      total++;
+      /* Counted by category, not by name - so cold chain (Aisar + Azmi + Idham) adds up to one figure. */
+      issuesOf(p,r).forEach(function(x){
+        var lab = plain(x.g)+" — "+plain(x.t);
+        tally[lab] = (tally[lab]||0)+1;
+      });
+      lowOf(p,r).forEach(function(x){
+        var lab = "Consumables — "+plain(x.t)+" below level";
+        tally[lab] = (tally[lab]||0)+1;
+      });
+    }); });
+
+    var tk = Object.keys(tally).sort(function(a,b){ return tally[b]-tally[a]; });
+    var tallyHtml = tk.length
+      ? '<div class="tally">'+tk.map(function(k){
+          return '<div class="tal"><span>'+esc(k)+'</span><b>'+tally[k]+'×</b></div>';
+        }).join("")+'</div>'
+      : '<p class="note">No problems recorded in this period · Tiada masalah direkod.</p>';
+
+    el.paneMinggu.innerHTML = '<div class="card"><table class="wk"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>'
+      + '<p class="legend" style="margin-top:12px">'
+      + '<span class="mk mk-y">✓</span> filled, no problems &nbsp; <span class="mk mk-p">!</span> problem reported &nbsp; '
+      + '<span class="mk mk-n">–</span> not filled<br>Seven days to '+date+' · '+total+' of 28 slots filled.</p>'
+      + '<div class="sub">Most frequent problems · Masalah paling kerap</div>' + tallyHtml
+      + '<button class="minbtn" id="xlsWeekBtn" style="margin-top:16px">Export these 7 days to Excel · Export 7 hari</button>';
+
+    var wb = byId("xlsWeekBtn");
+    if (wb) wb.onclick = function(){ exportXlsx(w); };
+  }
+
+  /* ---------- Excel export ----------
+     Three sheets in one file:
+       Summary  - one row per person per day, for filing and for a quick read
+       Detail   - one row per field, long format, built to be pivoted
+       Problems - only what was actually flagged, with the written details
+     Labels are the English ones so the export lines up with the KPI documents. */
+
+  function exportSheets(dates){
+    var summary = [], detail = [], problems = [];
+
+    dates.forEach(function(d){
+      PEOPLE.forEach(function(p){
+        var r = rows[key(d, p.id)];
+        var nama = p.nama;
+
+        var tasksDone = 0, tasksTotal = 0, probCount = 0, lowCount = 0;
+
+        p.groups.forEach(function(g){
+          g.items.forEach(function(it){
+            var label = plain(it.t), section = plain(g.t), val = "", flag = "";
+
+            if (g.type === "num"){
+              var n = r ? num(r.nums && r.nums[it.k]) : null;
+              val = (n === null ? "" : n);
+            } else if (g.type === "stock"){
+              var s = r ? num(r.stock && r.stock[it.k]) : null;
+              val = (s === null ? "" : s);
+              if (s !== null && s <= mins[it.k]){ flag = "LOW"; lowCount++; }
+            } else if (g.type === "check"){
+              tasksTotal++;
+              var done = !!(r && r.checks && r.checks[it.k]);
+              if (done) tasksDone++;
+              val = done ? "Yes" : "No";
+              if (!done && dueToday(it.k, d)) flag = "MISSED";
+            } else if (g.type === "issue"){
+              var hit = !!(r && r.issues && r.issues[it.k]);
+              val = hit ? "Yes" : "No";
+              if (hit){
+                flag = "PROBLEM";
+                probCount++;
+                problems.push({
+                  Date: d, Person: nama, Category: section, Problem: label,
+                  Details: (r.texts && r.texts.problem) ? r.texts.problem : ""
+                });
+              }
+            } else {
+              val = (r && r.texts && r.texts[it.k]) ? r.texts[it.k] : "";
+            }
+
+            detail.push({
+              Date: d, Person: nama, Section: section, Item: label,
+              Type: g.type, Value: val, Flag: flag
+            });
+          });
+        });
+
+        summary.push({
+          Date: d,
+          Person: nama,
+          Filled: r ? "Yes" : "No",
+          "Tasks done": r ? tasksDone : "",
+          "Tasks total": tasksTotal,
+          Problems: r ? probCount : "",
+          "To reorder": r ? lowCount : "",
+          "Ad-hoc": (r && r.texts && r.texts.adhoc) ? "Yes" : "",
+          "Ad-hoc note": (r && r.texts && r.texts.adhoc) ? r.texts.adhoc : "",
+          "Saved at": (r && (r.updated_at || r.updatedAt)) ? String(r.updated_at || r.updatedAt).replace("T"," ").slice(0,16) : ""
+        });
+      });
+    });
+
+    return { summary: summary, detail: detail, problems: problems };
+  }
+
+  function exportXlsx(dates){
+    if (typeof XLSX === "undefined"){
+      setBanner("Excel library did not load · Library Excel tak dapat dimuat. Check the internet connection.", "is-bad");
+      return;
+    }
+    var s = exportSheets(dates);
+    var wb = XLSX.utils.book_new();
+
+    var s1 = XLSX.utils.json_to_sheet(s.summary);
+    s1["!cols"] = [{wch:11},{wch:10},{wch:7},{wch:11},{wch:11},{wch:9},{wch:11},{wch:8},{wch:44},{wch:17}];
+    XLSX.utils.book_append_sheet(wb, s1, "Summary");
+
+    var s2 = XLSX.utils.json_to_sheet(s.detail);
+    s2["!cols"] = [{wch:11},{wch:10},{wch:26},{wch:46},{wch:8},{wch:38},{wch:9}];
+    XLSX.utils.book_append_sheet(wb, s2, "Detail");
+
+    var s3 = XLSX.utils.json_to_sheet(s.problems.length ? s.problems
+      : [{Date:"", Person:"", Category:"", Problem:"No problems recorded", Details:""}]);
+    s3["!cols"] = [{wch:11},{wch:10},{wch:26},{wch:40},{wch:60}];
+    XLSX.utils.book_append_sheet(wb, s3, "Problems");
+
+    var name = dates.length === 1
+      ? "checklist-" + dates[0] + ".xlsx"
+      : "checklist-" + dates[0] + "_to_" + dates[dates.length-1] + ".xlsx";
+    XLSX.writeFile(wb, name);
+  }
+
+  el.tarikh.onchange = function(){ date = el.tarikh.value||today; render(); loadAll(); };
+  byId("xlsDayBtn").onclick = function(){ exportXlsx([date]); };
+  byId("refreshBtn").onclick = function(){
+    var b = byId("refreshBtn"); b.disabled = true; b.textContent = "Loading…";
+    loadAll().then(function(){ b.disabled = false; b.textContent = "Refresh · Muat semula"; });
+  };
+  byId("t-isi").onclick    = function(){ tab="isi"; render(); };
+  byId("t-semak").onclick  = function(){ tab="semak"; render(); loadAll(); };
+  byId("t-minggu").onclick = function(){ tab="minggu"; render(); loadAll(); };
+
+  render();
+  loadAll();
+})();
+</script>
+</body>
+</html>
